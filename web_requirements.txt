@@ -1,0 +1,7 @@
+# Зависимости веб-версии dorkAI (файл dorkai_web.py):
+#   pip install -r web_requirements.txt
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+openai>=1.40.0
+orjson>=3.10.0
+python-dotenv>=1.0.1
