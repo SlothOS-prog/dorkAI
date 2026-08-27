@@ -1,99 +1,95 @@
 """
-cli.py — консольная оболочка (демонстрация того, что бэкенд не зависит от GUI).
+cli.py — console shell (proof that the backend works without the GUI).
 
-Запуск:  python main.py --cli
+Run:  python main.py --cli
+All comments stay in Russian (project convention); all user-facing text is English.
 """
 
-# Выход по Ctrl+C/Q — нужен sys.exit
+# sys.exit for graceful exits
 import sys
 
-# Доменные импорты ядра
+# Core imports of the dorkAI package
 from .config import Settings
 from .dork_generator import DorkGenerator
 from .exceptions import DorkAIError
 
-# Цвета ANSI для минимального «престижного» оформления терминала
-_C_RESET = "\033[0m"   # сброс цвета
-_C_DIM = "\033[2m"     # приглушённый серый — второстепенный текст
-_C_CYAN = "\033[36m"   # циан — акценты и заголовки
-_C_GREEN = "\033[32m"  # зелёный — сами дорки
+# ANSI colors for a minimal, tasteful terminal look
+_C_RESET = "\033[0m"   # reset to default color
+_C_DIM = "\033[2m"     # dim gray — secondary text
+_C_CYAN = "\033[36m"   # cyan — accents and headers
+_C_GREEN = "\033[32m"  # green — the dorks themselves
 
 
 def _print_result(result) -> None:
-    # Красиво печатаем GenerationResult в консоль
+    # Pretty-print a GenerationResult into the terminal
     print()
-    print(f"{_C_CYAN}Тема:{_C_RESET} {result.source_query}")
-    print(f"{_C_DIM}Найдено дорков: {len(result.dorks)} | время: {result.elapsed_seconds}s{_C_RESET}")
+    print(f"{_C_CYAN}Topic:{_C_RESET} {result.source_query}")
+    print(f"{_C_DIM}Dorks: {len(result.dorks)} | elapsed: {result.elapsed_seconds}s{_C_RESET}")
     print("-" * 60)
     for i, dork in enumerate(result.dorks, start=1):
-        # Номер и название техники
+        # Number and technique title
         print(f"{_C_CYAN}{i:>2}. {dork.title}{_C_RESET}")
-        # Сам дорк зелёным — его копируют в Google
+        # The dork itself in green — this is what users copy into Google
         print(f"    {_C_GREEN}{dork.query}{_C_RESET}")
-        # Пояснение серым (если есть)
+        # Explanation in dim gray (when provided by the model)
         if dork.description:
             print(f"    {_C_DIM}{dork.description}{_C_RESET}")
-        # Пустая строка-разделитель между дорками
+        # Blank separator line between dorks
         print()
 
 
 def run_console() -> int:
     """
-    Главный цикл консольного режима.
+    Main loop of the console mode.
 
     Returns:
-        Код выхода для main() (0 = норма).
+        Process exit code for main() (0 = success).
     """
-    # Баннер приложения
-    print(f"dorkAI {_C_DIM}(консольный режим){_C_RESET} — Google Dorks через ИИ")
+    # Application banner
+    print(f"dorkAI {_C_DIM}(console mode){_C_RESET} — Google Dorks via AI")
 
-    # Создаём настройки (читает окружение/.env один раз)
+    # Build settings once (reads environment variables and the .env file)
     settings = Settings()
 
-    # Если ключа нет — предлагаем вставить его прямо сейчас (одним вводом)
+    # If no key is present, offer a one-shot paste right here
     if not settings.has_api_key:
-        print(f"{_C_DIM}API-ключ не найден (env DORKAI_API_KEY или файл .env).{_C_RESET}")
-        # Единственный input в цикле до генерации — вставили и забыли
-        key = input("Вставьте API-ключ и нажмите Enter: ").strip()
+        print(f"{_C_DIM}No API key found (env DORKAI_API_KEY or the .env file).{_C_RESET}")
+        key = input("Paste your API key and press Enter: ").strip()
         if not settings.save_api_key(key):
-            # Сохранить не удалось (права диска) — выходим с ошибкой
-            print("Не удалось сохранить ключ в .env")
+            # Could not persist the key (disk permissions) — exit with error
+            print("Could not save the key to .env")
             return 1
-        # Подтверждаем успех
-        print("Ключ сохранён в .env\n")
+        print("Key saved to .env\n")
 
-    # Создаём сервис генерации поверх настроек
+    # Build the generation service on top of the settings
     generator = DorkGenerator(settings)
 
     try:
-        # Основной REPL: читаем тему -> печатаем дорки
+        # Main REPL: read a topic -> print generated dorks
         while True:
             try:
-                # Приглашение ввода
-                query = input("\nТема исследования (q — выход): ").strip()
+                query = input("\nResearch topic (q to quit): ").strip()
             except EOFError:
-                # stdin закрылся — аккуратно завершаемся
+                # stdin closed — finish gracefully
                 break
-            # Команда выхода
+            # Exit commands
             if query.lower() in {"q", "quit", "exit"}:
                 break
-            # Пустой ввод — просто переспрашиваем
+            # Empty input — just ask again
             if not query:
                 continue
             try:
-                # Полный путь через ядро: запрос -> AI -> JSON -> объекты Dork
+                # Full path through the core: query -> AI -> JSON -> Dork objects
                 result = generator.generate(query)
-                # Печатаем результат
                 _print_result(result)
             except DorkAIError as exc:
-                # Любая доменная ошибка показывается без стектрейса — понятно пользователю
-                print(f"Ошибка: {exc}", file=sys.stderr)
+                # Domain errors are printed plainly, without tracebacks
+                print(f"Error: {exc}", file=sys.stderr)
     except KeyboardInterrupt:
-        # Ctrl+C — мягкий выход
+        # Ctrl+C — soft exit
         pass
     finally:
-        # В любом случае освобождаем HTTP-ресурсы
+        # Release HTTP resources no matter what
         generator.close()
 
-    # Успешное завершение
     return 0
